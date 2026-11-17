@@ -2,10 +2,11 @@
 mcu/build/
 .xmake/
 fpga/build/*
+fpga/sim/work/
 .Xil/
 # 位流留在仓库里，没装 Vivado 也能直接烧（.bit 走 JTAG，.bin 固化到 SPI Flash）
-!fpga/build/mca_top.bit
-!fpga/build/mca_top.bin
+!fpga/build/mca.bit
+!fpga/build/mca.bin
 *.jou
 *.log
 *.backup.*

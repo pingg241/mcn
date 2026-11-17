@@ -43,11 +43,13 @@ set_property -dict {PACKAGE_PIN N20 IOSTANDARD LVCMOS33} [get_ports eth_rst_n]
 ## =====================================================================
 create_clock -period 8.000 -name eth_rxc [get_ports eth_rxc]
 
-set clk_eth   [get_clocks -of_objects [get_pins u_clk/u_mmcm/CLKOUT0]]
-set clk_eth90 [get_clocks -of_objects [get_pins u_clk/u_mmcm/CLKOUT1]]
-set clk_ref   [get_clocks -of_objects [get_pins u_clk/u_mmcm/CLKOUT2]]
-set clk_adc   [get_clocks -of_objects [get_pins u_clk/u_pll/CLKOUT0]]
-set clk_fwd   [get_clocks -of_objects [get_pins u_clk/u_pll/CLKOUT1]]
+## 顶层是 Block Design：模块内的路径为 mca_block_i/<方块名>/inst/...
+
+set clk_eth   [get_clocks -of_objects [get_pins mca_block_i/u_clk/inst/u_mmcm/CLKOUT0]]
+set clk_eth90 [get_clocks -of_objects [get_pins mca_block_i/u_clk/inst/u_mmcm/CLKOUT1]]
+set clk_ref   [get_clocks -of_objects [get_pins mca_block_i/u_clk/inst/u_mmcm/CLKOUT2]]
+set clk_adc   [get_clocks -of_objects [get_pins mca_block_i/u_clk/inst/u_pll/CLKOUT0]]
+set clk_fwd   [get_clocks -of_objects [get_pins mca_block_i/u_clk/inst/u_pll/CLKOUT1]]
 
 ## 三个时钟域之间只经过异步 FIFO、两级同步器和握手（数据在握手期间保持不变）
 set_clock_groups -asynchronous \
@@ -64,7 +66,7 @@ set_input_delay -clock eth_rxc -max [expr 4.0 - $rx_dv] [get_ports {eth_rxd[*] e
 set_input_delay -clock eth_rxc -min $rx_dv              [get_ports {eth_rxd[*] eth_rx_ctl}] -clock_fall -add_delay
 
 ## ---------------- RGMII TX：TXC 由 90° 时钟的 ODDR 转发 ----------------
-create_generated_clock -name eth_txc_out -source [get_pins u_rgmii/u_oddr_txc/C] -multiply_by 1 [get_ports eth_txc]
+create_generated_clock -name eth_txc_out -source [get_pins mca_block_i/u_rgmii/inst/u_oddr_txc/C] -multiply_by 1 [get_ports eth_txc]
 ## PHY 侧（未开 TX 内部延时）要求建立 1.0 ns、保持 0.8 ns
 set_output_delay -clock eth_txc_out -max  1.0 [get_ports {eth_txd[*] eth_tx_ctl}]
 set_output_delay -clock eth_txc_out -min -0.8 [get_ports {eth_txd[*] eth_tx_ctl}]
@@ -75,7 +77,7 @@ set_output_delay -clock eth_txc_out -min -0.8 [get_ports {eth_txd[*] eth_tx_ctl}
 
 ## ---------------- AD9280：ad_clk 由 ODDR 转发 ----------------
 ## 假设输出延时 tOD = 20..30 ns（相对 ad_clk 上升沿），表达为相对下一个沿 -11.25..-1.25 ns
-create_generated_clock -name ad_clk_out -source [get_pins u_adc/u_oddr_adclk/C] -multiply_by 1 [get_ports ad_clk]
+create_generated_clock -name ad_clk_out -source [get_pins mca_block_i/u_adc/inst/u_oddr_adclk/C] -multiply_by 1 [get_ports ad_clk]
 set_input_delay -clock ad_clk_out -max -1.25  [get_ports {ad_data[*] ad_otr}]
 set_input_delay -clock ad_clk_out -min -11.25 [get_ports {ad_data[*] ad_otr}]
 

@@ -3,6 +3,7 @@
 module adc_if (
     input            clk_adc,      // 内部采样时钟
     input            clk_adc_fwd,  // 带相位的转发时钟
+    (* X_INTERFACE_PARAMETER = "FREQ_HZ 32000000" *)   // Block Design 里输出时钟要标频率
     output           ad_clk,
     input  [7:0]     ad_data,
     input            ad_otr,

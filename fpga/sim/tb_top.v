@@ -1,5 +1,6 @@
 `timescale 1ns / 1ps
-// 全系统仿真：mca_top + RGMII PHY 模型 + AD9280 模型。
+// 全系统仿真：顶层 Block Design（build/mca_sim 生成的仿真版：心跳 1 ms、PHY 复位 100 拍）
+// + RGMII PHY 模型 + AD9280 模型。
 // 激励帧来自 rx_frames.txt（由 tb_top_frames.py gen 生成），
 // FPGA 发出的帧写入 tx_frames.txt（由 tb_top_frames.py check 检查）。
 module tb_top;
@@ -14,11 +15,7 @@ module tb_top;
     wire       eth_rxc, eth_rx_ctl, eth_txc, eth_tx_ctl, eth_rst_n;
     wire [3:0] eth_rxd, eth_txd, led;
 
-    mca_top #(
-        .PHY_RST_CYCLES(100),
-        .HB_CYCLES(125_000),                 // 心跳 1 ms（加速仿真）
-        .CYC_PER_MS(125_000)
-    ) dut (
+    mca_block dut (
         .sys_clk(sys_clk), .sys_rst_n(sys_rst_n),
         .ad_clk(ad_clk), .ad_data(ad_data), .ad_otr(ad_otr),
         .eth_rxc(eth_rxc), .eth_rx_ctl(eth_rx_ctl), .eth_rxd(eth_rxd),
@@ -67,7 +64,7 @@ module tb_top;
     initial begin
         forever begin
             #500_000;
-            $display("[%0t] 收到 %0d 帧  speed=%0d  led=%b", $time, u_phy.got, dut.speed, led);
+            $display("[%0t] 收到 %0d 帧  led=%b", $time, u_phy.got, led);
         end
     end
 endmodule

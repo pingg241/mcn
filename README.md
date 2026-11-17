@@ -17,10 +17,11 @@
 
 | 路径 | 内容 |
 |------|------|
-| `fpga/rtl` | Verilog：`mca_top` 顶层，`adc_if`、`pulse_proc`（滤波与判别）、`wave_capture`、`rgmii_if`、`eth_*`（硬件 UDP/ARP）、`mcev_packer`、`test_pulser` |
+| `fpga/rtl` | Verilog 模块：`adc_if`、`pulse_proc`（滤波与判别）、`wave_capture`、`rgmii_if`、`eth_*`（硬件 UDP/ARP）、`mcev_packer`、`test_pulser`、`phy_rst`、`led_drv` |
 | `fpga/constr` | 达芬奇Pro 引脚与时序约束 |
 | `fpga/sim` | xsim 测试台：`tb_pulse`（滤波链）、`tb_top`（整机，含 PHY 与 AD9280 模型） |
-| `fpga/scripts/build.tcl` | Vivado 非工程模式全流程 |
+| `fpga/scripts/block_design.tcl` | 顶层 Block Design，生成 Vivado 工程 |
+| `fpga/scripts/build.tcl` | 全流程：建工程 → 综合 → 实现 → 位流 |
 | `mcu/app` | 与硬件无关的 MCU 应用（协议、FPGA 链路、能谱、寻峰、界面、控制台…） |
 | `mcu/port/stm32h7` | STM32H743 固件：时钟/MPU、ST7796S、以太网 + LwIP、闪存存储 |
 | `mcu/port/host` | PC 宿主版：同一套 `app/` 跑在 Windows / Linux（WSL）上，真实 UDP + 窗口显示；笔记本代替 STM32 时用它 |
@@ -62,15 +63,22 @@ python mcu/scripts/fetch_deps.py
 
 ## FPGA
 
+顶层是 Vivado Block Design `mca_block`，由 `scripts/block_design.tcl` 生成：各方块以 Module Reference 方式直接引用
+`rtl/` 的源码，复位用 Xilinx 的 Processor System Reset。这个脚本就是顶层的源码，工程每次都重新生成——在 GUI 里改了图，
+要把改动写回脚本，否则下次编译会被覆盖。
+
 Vivado 2023.2（在 `fpga/` 下运行）：
 
 ```
 vivado -mode batch -nojournal -log build/vivado.log -source scripts/build.tcl
 ```
 
-产物 `fpga/build/mca_top.bit`（JTAG 下载）和 `mca_top.bin`（SPIx4 配置闪存，Hardware Manager 里
-Add Configuration Memory Device 后烧写）。这两个文件随仓库提交，和当前源码一致；改了 RTL 重新编译后记得一起提交。当前结果：WNS +0.221 ns、WHS +0.067 ns；LUT 4146（20%）、
-FF 5639、BRAM 5.5、DSP 7。
+它先运行 `block_design.tcl` 建工程 `build/mca_block/mca_block.xpr`，再综合、实现、出位流；跑完可以用 Vivado 打开这个工程
+看图和结果，也可以在 GUI 里直接改、重新编译。只建工程不编译：`vivado -mode batch -nojournal -nolog -source scripts/block_design.tcl`。
+
+产物 `fpga/build/mca.bit`（JTAG 下载）和 `mca.bin`（SPIx4 配置闪存，Hardware Manager 里
+Add Configuration Memory Device 后烧写）。这两个文件随仓库提交，和当前源码一致；改了 RTL 重新编译后记得一起提交。当前结果：WNS +0.221 ns、WHS +0.036 ns；LUT 4183（20%）、
+FF 5749、BRAM 5.5、DSP 7。
 
 仿真（Vivado 自带 xsim）：
 
@@ -80,12 +88,8 @@ python fpga/sim/run_sim.py tb_top --giga 1     # 千兆；--giga 0 百兆
 ```
 
 `tb_top` 走完整链路：PHY 模型收发以太网帧，`tb_top_frames.py` 检查 ARP、命令应答、事件能量（误差 ≤ 0.5%）、
-心跳与波形包。
-
-Block Design（只用来看结构、出图）：在 `fpga/` 下
-`vivado -mode batch -nojournal -nolog -source scripts/block_design.tcl`，生成 `build/mca_block/mca_block.xpr`，
-用 Vivado 打开后 IP INTEGRATOR → Open Block Design。各模块直接引用 `rtl/` 的源码，连线和 `mca_top.v` 一致；
-`mca_top.v` 顶层的复位合成、PHY 复位延时和指示灯逻辑在图上包成 `top_glue` 方块。
+心跳与波形包。仿真的就是顶层 Block Design：第一次运行或改了 `block_design.tcl`、`rtl/` 之后，会先用 Vivado 生成仿真版工程
+`build/mca_sim/`（心跳 1 ms、PHY 复位 100 拍，其余和上板的一样），约半分钟。
 
 不接 MCU 时可以用 PC 直接测板子（网口直连 PC，PC 设 192.168.1.x）：
 
@@ -200,9 +204,9 @@ python tools/mca_tool.py --mcu 192.168.1.20 mcu-spec --out spec.csv
 
 | 项 | 位置 | 默认 | 现象 / 调整 |
 |----|------|------|-------------|
-| RGMII 接收延时 | `mca_top.v` `IDELAY_VALUE` | 10 抽头（0.78 ns） | `reg 0x14C`（RX_ERRORS）持续增长就调 |
-| RGMII 发送时钟相位 | `mca_top.v` `TXC_90` | 1（TXC 移 90°，参考已上板验证的工程） | PC 抓不到 FPGA 的包时改 0 |
-| AD9280 采样相位 | `mca_top.v` `ADC_CLK_PHASE` | 180° | 波形出现毛刺/台阶时调整 |
+| RGMII 接收延时 | `block_design.tcl` 里 `u_rgmii` 的 `IDELAY_VALUE` | 10 抽头（0.78 ns） | `reg 0x14C`（RX_ERRORS）持续增长就调 |
+| RGMII 发送时钟相位 | `block_design.tcl` 里 `u_rgmii` 的 `TXC_90` | 1（TXC 移 90°，参考已上板验证的工程） | PC 抓不到 FPGA 的包时改 0 |
+| AD9280 采样相位 | `block_design.tcl` 里 `u_clk` 的 `ADC_CLK_PHASE` | 180° | 波形出现毛刺/台阶时调整 |
 | PHY 型号 | 达芬奇Pro 板载 YT8511 | 上电自协商 | `status` 里看 link 与速率 |
 | MCU 板 | `mcu/port/stm32h7/board.h` | WeAct MiniSTM32H743：25 MHz HSE、LED PE3、KEY PC13 | 换板改这里 |
 | 屏接线 | `board.h` | SPI4：SCK PE12、MOSI PE14、CS PE11、DC PE13、BL PE10、RST PE9 | 方向不对改 `LCD_MADCTL`（0x28/0xE8），颜色反了改 `LCD_INVERT`（默认 1，按 IPS 屏开反显） |
