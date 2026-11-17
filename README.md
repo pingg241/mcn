@@ -11,7 +11,7 @@
               能量刻度、直方图、死时间/丢包校正、寻峰拟合、显示、存储、文本控制台
 ```
 
-协议细节见 [docs/protocol.md](docs/protocol.md)，FPGA 原理图（Vivado 导出）见 [docs/schematic.pdf](docs/schematic.pdf)。
+协议细节见 [docs/protocol.md](docs/protocol.md)，FPGA 顶层 Block Design（Vivado 导出）见 [docs/mca_block.pdf](docs/mca_block.pdf)。
 
 ## 目录
 
@@ -81,6 +81,11 @@ python fpga/sim/run_sim.py tb_top --giga 1     # 千兆；--giga 0 百兆
 
 `tb_top` 走完整链路：PHY 模型收发以太网帧，`tb_top_frames.py` 检查 ARP、命令应答、事件能量（误差 ≤ 0.5%）、
 心跳与波形包。
+
+Block Design（只用来看结构、出图）：在 `fpga/` 下
+`vivado -mode batch -nojournal -nolog -source scripts/block_design.tcl`，生成 `build/mca_block/mca_block.xpr`，
+用 Vivado 打开后 IP INTEGRATOR → Open Block Design。各模块直接引用 `rtl/` 的源码，连线和 `mca_top.v` 一致；
+`mca_top.v` 顶层的复位合成、PHY 复位延时和指示灯逻辑在图上包成 `top_glue` 方块。
 
 不接 MCU 时可以用 PC 直接测板子（网口直连 PC，PC 设 192.168.1.x）：
 
