@@ -1,0 +1,18 @@
+# 编译产物：xmake、Vivado 重新生成
+mcu/build/
+.xmake/
+fpga/build/
+.Xil/
+*.jou
+*.log
+*.backup.*
+
+# STM32 固件第三方库（HAL、CMSIS、LwIP）：python mcu/scripts/fetch_deps.py 拉取
+mcu/third_party/
+
+# 运行时数据：宿主版的存储槽
+host_nv/
+
+# Python
+__pycache__/
+*.pyc
