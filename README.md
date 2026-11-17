@@ -11,7 +11,7 @@
               能量刻度、直方图、死时间/丢包校正、寻峰拟合、显示、存储、文本控制台
 ```
 
-协议细节见 [docs/protocol.md](docs/protocol.md)，FPGA 顶层 Block Design（Vivado 导出）见 [docs/mca_block.pdf](docs/mca_block.pdf)。
+功能总结见 [docs/summary.md](docs/summary.md)，协议细节见 [docs/protocol.md](docs/protocol.md)，FPGA 顶层 Block Design（Vivado 导出）见 [docs/mca_block.pdf](docs/mca_block.pdf)。
 
 ## 目录
 
