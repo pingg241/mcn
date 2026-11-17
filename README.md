@@ -27,6 +27,39 @@
 | `mcu/tests` | 单元测试、宿主版 + 假 FPGA 端到端测试 |
 | `tools/mca_tool.py` | PC 工具：直连 FPGA 测试、假 FPGA、MCU 控制台客户端 |
 
+## 拿到代码之后
+
+```
+git clone https://github.com/pingg241/mcn.git
+```
+
+都要 Git、Python 3 和 [xmake](https://xmake.io)，其余按要做的事装：
+
+| 要做的事 | 还需要 | 第三方库 |
+|----------|--------|----------|
+| 烧 FPGA | Vivado 的 Hardware Manager（只烧不编译可以装小得多的 Vivado Lab Edition）；编好的位流已在仓库里 | 不用 |
+| 笔记本终端 mca_host、单元测试 | Windows：MSYS2 里 `pacman -S mingw-w64-x86_64-gcc`；Linux：`gcc`、`libx11-dev` | 不用 |
+| STM32 固件 | Windows：MSYS2 里 `pacman -S mingw-w64-x86_64-arm-none-eabi-gcc` | 要 |
+| 改 FPGA 后重新编译、仿真 | Vivado 2023.2 | 不用 |
+
+`mca_tool.py` 的 `--plot` 画图另外要 `pip install matplotlib`。
+
+第三方库（ST 的 HAL、CMSIS 和 LwIP，约 80 MB）不放在仓库里，只有编 STM32 固件才要。在项目根目录运行一次：
+
+```
+python mcu/scripts/fetch_deps.py
+```
+
+它用 git 从 ST 的 GitHub 按脚本里写死的版本浅克隆到 `mcu/third_party/`，十几秒。版本固定，谁拉下来编出的固件都一模一样。
+
+编译命令见下面"MCU"一节，有两个参数按自己的机器填：
+
+- `--mingw=`：MSYS2 不在默认的 `C:\msys64` 时，给 `xmake f -p mingw` 加 `--mingw=<MSYS2 目录>/mingw64`。
+- `--sdk=`：编固件用，填 arm-none-eabi-gcc 所在 `bin` 目录的上一级，MSYS2 装的就是 `<MSYS2 目录>/mingw64`。
+  Linux 上 `sudo apt install gcc-arm-none-eabi` 后用 `--sdk=/usr`（这条没实测过）。
+
+编出来的 `mca_host.exe` 只依赖 Windows 自带的 DLL，拷到没装 MSYS2 的电脑上也能直接运行。
+
 ## FPGA
 
 Vivado 2023.2（在 `fpga/` 下运行）：
@@ -36,7 +69,7 @@ vivado -mode batch -nojournal -log build/vivado.log -source scripts/build.tcl
 ```
 
 产物 `fpga/build/mca_top.bit`（JTAG 下载）和 `mca_top.bin`（SPIx4 配置闪存，Hardware Manager 里
-Add Configuration Memory Device 后烧写）。当前结果：WNS +0.221 ns、WHS +0.067 ns；LUT 4146（20%）、
+Add Configuration Memory Device 后烧写）。这两个文件随仓库提交，和当前源码一致；改了 RTL 重新编译后记得一起提交。当前结果：WNS +0.221 ns、WHS +0.067 ns；LUT 4146（20%）、
 FF 5639、BRAM 5.5、DSP 7。
 
 仿真（Vivado 自带 xsim）：
@@ -60,11 +93,10 @@ python tools/mca_tool.py wave --src 1 --plot
 
 ## MCU
 
-工具链：xmake、MSYS2 的 `mingw-w64-x86_64-gcc`（宿主版）和 `mingw-w64-x86_64-arm-none-eabi-gcc`（固件）。
-第三方库（HAL、CMSIS、LwIP，固定版本）：`python mcu/scripts/fetch_deps.py`。在 `mcu/` 下：
+工具链和第三方库见上面"拿到代码之后"。在 `mcu/` 下：
 
 ```
-# PC 宿主版与单元测试（Windows）
+# PC 宿主版与单元测试（Windows；MSYS2 不在 C:\msys64 时加 --mingw=<MSYS2 目录>/mingw64）
 xmake f -p mingw && xmake
 xmake run tests
 python tests/e2e_host.py          # 假 FPGA + 宿主版，结果和截图在 build/e2e/
@@ -74,7 +106,7 @@ xmake f -p linux && xmake
 xmake run tests
 python3 tests/e2e_host.py
 
-# STM32H743 固件
+# STM32H743 固件（先 fetch_deps；--sdk 按自己的 MSYS2 目录改）
 xmake f -p cross -a cortex-m7 --toolchain=gnu-rm --sdk=D:/msys64/mingw64 && xmake
 ```
 
